@@ -1,0 +1,1559 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>우땅이의 작은 픽셀 작업실</title>
+    <!-- 픽셀 감성 한글 폰트 (Galmuri11 & DungGeunMo) -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/galmuri/dist/galmuri.css">
+    <style>
+        :root {
+            --bg-outer: #2c2530;
+            --wall-pastel: #fce8d5;
+            --wall-trim: #e5c3a6;
+            --wall-border: #5a4638;
+            --floor-light: #e3b788;
+            --floor-dark: #d1a06e;
+            --floor-line: #b88452;
+            --pixel-shadow: rgba(65, 44, 30, 0.22);
+        }
+
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+            image-rendering: pixelated;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg-outer);
+            font-family: 'Galmuri11', monospace, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            overflow-x: hidden;
+            color: #4a3525;
+        }
+
+        /* 모바일 세로 화면 비율에 맞춘 메인 컨테이너 */
+        .app-frame {
+            width: 100%;
+            max-width: 430px;
+            height: 100vh;
+            max-height: 860px;
+            min-height: 680px;
+            background-color: #3a303f;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
+            overflow: hidden;
+            border-left: 4px solid #1e1822;
+            border-right: 4px solid #1e1822;
+        }
+
+        /* 상단 픽셀 UI 헤더 */
+        .top-bar {
+            background: #fff8f0;
+            border-bottom: 4px solid #5a4638;
+            padding: 10px 14px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 30;
+        }
+
+        .room-title {
+            font-size: 15px;
+            font-weight: bold;
+            color: #5a4638;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .status-badge {
+            background: #ffdf8e;
+            border: 2px solid #5a4638;
+            padding: 3px 8px;
+            font-size: 11px;
+            border-radius: 4px;
+            box-shadow: 2px 2px 0 #5a4638;
+        }
+
+        /* 탑다운 방 전체 영역 */
+        .room-viewport {
+            flex: 1;
+            position: relative;
+            background: #483b4d;
+            padding: 12px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .room-box {
+            flex: 1;
+            position: relative;
+            border: 6px solid #4a3525;
+            border-radius: 6px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            box-shadow: inset 0 0 0 4px #785a43;
+        }
+
+        /* 위쪽 파스텔톤 뒷벽 (정면 벽면) */
+        .back-wall {
+            height: 175px;
+            background: linear-gradient(
+                to bottom,
+                #ffdce5 0%,
+                #ffdce5 14px,
+                #fff3e6 14px,
+                #fff3e6 155px,
+                #e0bfa0 155px,
+                #e0bfa0 175px
+            );
+            border-bottom: 5px solid #5a4638;
+            position: relative;
+            z-index: 5;
+        }
+
+        /* 벽지 은은한 도트 패턴 */
+        .back-wall::before {
+            content: '';
+            position: absolute;
+            top: 14px;
+            left: 0;
+            right: 0;
+            bottom: 20px;
+            background-image: radial-gradient(#f2d4c2 2px, transparent 2px);
+            background-size: 20px 20px;
+            opacity: 0.6;
+            pointer-events: none;
+        }
+
+        /* 따뜻한 나무 바닥 영역 */
+        .wood-floor {
+            flex: 1;
+            position: relative;
+            background-color: var(--floor-light);
+            /* 픽셀 나무 마루판 패턴 */
+            background-image:
+                linear-gradient(to bottom, rgba(168, 114, 64, 0.35) 2px, transparent 2px),
+                linear-gradient(90deg, transparent 49%, rgba(168, 114, 64, 0.3) 49%, rgba(168, 114, 64, 0.3) 51%, transparent 51%);
+            background-size: 100% 32px, 96px 64px;
+            box-shadow: inset 0 12px 0 rgba(90, 70, 56, 0.15);
+            cursor: pointer;
+        }
+
+        /* 클릭 가능한 가구 공통 스타일 */
+        .furniture {
+            position: absolute;
+            cursor: pointer;
+            transition: transform 0.12s steps(2);
+            z-index: 10;
+        }
+
+        .furniture:hover {
+            filter: brightness(1.04);
+        }
+
+        .furniture:active {
+            transform: scale(0.96);
+        }
+
+        /* 가구 호버/선택 시 둥둥 뜨는 안내 라벨 */
+        .furn-tag {
+            position: absolute;
+            top: -22px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #5a4638;
+            color: #fff8f0;
+            font-size: 10px;
+            padding: 2px 6px;
+            border-radius: 3px;
+            white-space: nowrap;
+            opacity: 0.88;
+            pointer-events: none;
+            box-shadow: 0 2px 0 rgba(0,0,0,0.3);
+        }
+
+        /* 1. 숲이 보이는 창문 (벽 중앙) */
+        .window-unit {
+            top: 22px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 132px;
+            height: 112px;
+        }
+        .window-unit:active {
+            transform: translateX(-50%) scale(0.96);
+        }
+
+        /* 2. 벽에 거는 달력 (벽 왼쪽) */
+        .calendar-unit {
+            top: 32px;
+            left: 16px;
+            width: 58px;
+            height: 68px;
+        }
+
+        /* 3. 벽에 거는 메모판 (벽 오른쪽) */
+        .memoboard-unit {
+            top: 30px;
+            right: 16px;
+            width: 72px;
+            height: 70px;
+        }
+
+        /* 4. 책장 (바닥 왼쪽 위) */
+        .bookshelf-unit {
+            top: 14px;
+            left: 14px;
+            width: 104px;
+            height: 92px;
+        }
+
+        /* 5. 작업 책상 & 의자 (바닥 오른쪽 중단) */
+        .desk-unit {
+            top: 125px;
+            right: 16px;
+            width: 146px;
+            height: 118px;
+        }
+
+        /* 6. 중앙 아늑한 픽셀 러그 (장식용) */
+        .pixel-rug {
+            position: absolute;
+            bottom: 45px;
+            left: 24px;
+            width: 160px;
+            height: 110px;
+            background: #ffe6eb;
+            border: 4px solid #d99ba8;
+            border-radius: 8px;
+            box-shadow: inset 0 0 0 4px #fff7f9, 0 4px 0 rgba(90, 70, 56, 0.15);
+            pointer-events: none;
+            z-index: 2;
+        }
+
+        .pixel-rug::after {
+            content: '✿';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #e89cae;
+            font-size: 24px;
+        }
+
+        /* 화분 장식 */
+        .plant-decor {
+            position: absolute;
+            bottom: 18px;
+            right: 18px;
+            width: 44px;
+            height: 52px;
+            pointer-events: none;
+            z-index: 8;
+        }
+
+        /* 발자국/목적지 표시 링 */
+        .target-marker {
+            position: absolute;
+            width: 28px;
+            height: 16px;
+            border: 3px solid #ff7b7b;
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+            opacity: 0;
+            z-index: 4;
+            animation: pulseRing 0.8s infinite alternate steps(2);
+        }
+
+        @keyframes pulseRing {
+            from { transform: translate(-50%, -50%) scale(0.85); }
+            to { transform: translate(-50%, -50%) scale(1.15); }
+        }
+
+        /* 우땅이 캐릭터 컨테이너 */
+        .woodang-actor {
+            position: absolute;
+            width: 68px;
+            height: 76px;
+            transform: translate(-50%, -80%);
+            z-index: 20;
+            pointer-events: none;
+            transition: none;
+        }
+
+        /* 우땅이 발밑 그림자 */
+        .woodang-shadow {
+            position: absolute;
+            bottom: 4px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 42px;
+            height: 14px;
+            background: rgba(58, 39, 25, 0.32);
+            border-radius: 50%;
+        }
+
+        /* 우땅이 픽셀 아트 SVG 래퍼 (걷기 통통 애니메이션) */
+        .woodang-sprite {
+            width: 100%;
+            height: 100%;
+            transform-origin: bottom center;
+        }
+
+        .woodang-actor.walking .woodang-sprite {
+            animation: woodangWalk 0.28s infinite alternate steps(2);
+        }
+
+        .woodang-actor.idle .woodang-sprite {
+            animation: woodangIdle 1.2s infinite alternate steps(2);
+        }
+
+        .woodang-actor.happy .woodang-sprite {
+            animation: woodangJump 0.35s 2 alternate steps(2);
+        }
+
+        @keyframes woodangWalk {
+            0% { transform: translateY(0px) rotate(-4deg); }
+            100% { transform: translateY(-6px) rotate(4deg); }
+        }
+
+        @keyframes woodangIdle {
+            0% { transform: scaleY(1); }
+            100% { transform: scaleY(0.96); }
+        }
+
+        @keyframes woodangJump {
+            0% { transform: translateY(0px); }
+            100% { transform: translateY(-12px); }
+        }
+
+        /* 우땅이 머리 위 말풍선 */
+        .speech-bubble {
+            position: absolute;
+            bottom: 78px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #ffffff;
+            border: 3px solid #4a3525;
+            border-radius: 6px;
+            padding: 6px 10px;
+            font-size: 11px;
+            line-height: 1.35;
+            color: #3a281c;
+            white-space: nowrap;
+            box-shadow: 3px 3px 0 rgba(74, 53, 37, 0.35);
+            opacity: 0;
+            transition: opacity 0.15s steps(2);
+            z-index: 35;
+            pointer-events: none;
+        }
+
+        .speech-bubble.show {
+            opacity: 1;
+        }
+
+        .speech-bubble::after {
+            content: '';
+            position: absolute;
+            bottom: -8px;
+            left: 50%;
+            transform: translateX(-50%);
+            border-width: 8px 6px 0;
+            border-style: solid;
+            border-color: #4a3525 transparent transparent;
+        }
+
+        /* 하단 컨트롤 / 퀵 이동 바 */
+        .bottom-dock {
+            background: #fff8f0;
+            border-top: 4px solid #5a4638;
+            padding: 10px 10px 14px;
+            z-index: 30;
+        }
+
+        .dock-hint {
+            font-size: 11px;
+            text-align: center;
+            color: #7c604b;
+            margin-bottom: 8px;
+        }
+
+        .quick-buttons {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 6px;
+        }
+
+        .pixel-btn {
+            background: #ffeedb;
+            border: 2px solid #5a4638;
+            border-radius: 4px;
+            padding: 6px 2px;
+            font-family: inherit;
+            font-size: 11px;
+            font-weight: bold;
+            color: #4a3525;
+            cursor: pointer;
+            box-shadow: 0 3px 0 #5a4638;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 2px;
+            transition: transform 0.08s;
+        }
+
+        .pixel-btn:active {
+            transform: translateY(2px);
+            box-shadow: 0 1px 0 #5a4638;
+        }
+
+        .pixel-btn.active {
+            background: #ffd37a;
+        }
+
+        /* 상호작용 팝업 모달 (달력, 메모판, 책상 등 상세 보기) */
+        .pixel-modal-backdrop {
+            position: absolute;
+            inset: 0;
+            background: rgba(32, 24, 36, 0.55);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+            z-index: 50;
+        }
+
+        .pixel-modal-backdrop.open {
+            display: flex;
+        }
+
+        .pixel-modal {
+            width: 100%;
+            max-width: 320px;
+            background: #fffaf2;
+            border: 4px solid #4a3525;
+            border-radius: 6px;
+            box-shadow: 6px 6px 0 #2b1e15;
+            padding: 16px;
+            position: relative;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 3px dashed #d8bfa8;
+            padding-bottom: 8px;
+            margin-bottom: 12px;
+            font-weight: bold;
+            font-size: 14px;
+        }
+
+        .modal-close {
+            background: #ff8e8e;
+            border: 2px solid #4a3525;
+            color: #4a3525;
+            font-family: inherit;
+            font-weight: bold;
+            font-size: 12px;
+            padding: 2px 7px;
+            cursor: pointer;
+            box-shadow: 2px 2px 0 #4a3525;
+        }
+
+        .modal-body {
+            font-size: 12px;
+            line-height: 1.6;
+            color: #4a3525;
+        }
+
+        .memo-input-row {
+            display: flex;
+            gap: 6px;
+            margin-top: 10px;
+        }
+
+        .memo-input {
+            flex: 1;
+            border: 2px solid #5a4638;
+            background: #fff;
+            padding: 6px;
+            font-family: inherit;
+            font-size: 12px;
+            outline: none;
+        }
+
+        .memo-add-btn {
+            background: #a8e6cf;
+            border: 2px solid #4a3525;
+            font-family: inherit;
+            font-size: 12px;
+            font-weight: bold;
+            padding: 0 10px;
+            cursor: pointer;
+            box-shadow: 2px 2px 0 #4a3525;
+        }
+
+        .memo-list {
+            list-style: none;
+            padding: 0;
+            margin: 8px 0 0;
+            max-height: 130px;
+            overflow-y: auto;
+        }
+
+        .memo-list li {
+            background: #fff3b0;
+            border: 2px solid #c7b15e;
+            padding: 5px 8px;
+            margin-bottom: 5px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 11px;
+        }
+
+        .memo-del {
+            background: none;
+            border: none;
+            color: #b84a4a;
+            font-weight: bold;
+            cursor: pointer;
+            font-family: inherit;
+        }
+
+        /* 화면 아래에서 올라오는 픽셀 서랍 패널 (메모판 & 달력 전용) */
+        .bottom-drawer {
+            position: absolute;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: #fffaf2;
+            border-top: 4px solid #4a3525;
+            border-radius: 12px 12px 0 0;
+            box-shadow: 0 -8px 24px rgba(32, 24, 36, 0.45);
+            padding: 14px 16px 18px;
+            z-index: 45;
+            transform: translateY(105%);
+            transition: transform 0.22s steps(5);
+            max-height: 62%;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .bottom-drawer.open {
+            transform: translateY(0);
+        }
+
+        .drawer-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 3px dashed #d8bfa8;
+            padding-bottom: 8px;
+            margin-bottom: 10px;
+            font-weight: bold;
+            font-size: 14px;
+            color: #4a3525;
+        }
+
+        .drawer-body {
+            overflow-y: auto;
+            flex: 1;
+            font-size: 12px;
+        }
+
+        /* 할 일 목록 스타일 */
+        .todo-item {
+            background: #fff4b8;
+            border: 2px solid #c7b15e;
+            border-radius: 4px;
+            padding: 7px 9px;
+            margin-bottom: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+        }
+
+        .todo-item.done {
+            background: #ece6dc;
+            border-color: #b8afa2;
+            color: #8c8275;
+        }
+
+        .todo-item.done .todo-text {
+            text-decoration: line-through;
+        }
+
+        .todo-left {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex: 1;
+            cursor: pointer;
+            word-break: break-all;
+        }
+
+        .todo-checkbox {
+            width: 16px;
+            height: 16px;
+            accent-color: #5a4638;
+            cursor: pointer;
+            flex-shrink: 0;
+        }
+
+        /* 달력 D-day 마감 목록 스타일 */
+        .dday-form {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            margin-bottom: 10px;
+            background: #f7ece1;
+            padding: 8px;
+            border: 2px solid #d4b99e;
+            border-radius: 4px;
+        }
+
+        .dday-form-row {
+            display: flex;
+            gap: 6px;
+        }
+
+        .dday-item {
+            background: #ffffff;
+            border: 2px solid #5a4638;
+            border-radius: 4px;
+            padding: 7px 10px;
+            margin-bottom: 6px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 2px 2px 0 rgba(90, 70, 56, 0.2);
+        }
+
+        .dday-item.urgent {
+            background: #ffe8e8;
+            border-color: #d93838;
+            color: #c92a2a;
+            font-weight: bold;
+        }
+
+        .dday-badge {
+            background: #ffdf8e;
+            border: 1.5px solid #5a4638;
+            padding: 1px 6px;
+            border-radius: 3px;
+            margin-right: 6px;
+            font-weight: bold;
+            font-size: 11px;
+        }
+
+        .dday-item.urgent .dday-badge {
+            background: #ff5252;
+            border-color: #8f1d1d;
+            color: #ffffff;
+        }
+    </style>
+</head>
+<body>
+
+<div class="app-frame">
+    <!-- 상단 타이틀 바 -->
+    <header class="top-bar">
+        <div class="room-title">
+            <span>🐵</span>
+            <span>우땅이의 작은 작업실</span>
+        </div>
+        <div class="status-badge" id="statusBadge">휴식 중 ♪</div>
+    </header>
+
+    <!-- 탑다운 픽셀 작업실 뷰포트 -->
+    <main class="room-viewport">
+        <div class="room-box" id="roomBox">
+            
+            <!-- 1. 파스텔톤 뒷벽 -->
+            <div class="back-wall">
+                <!-- 벽걸이 달력 -->
+                <div class="furniture calendar-unit" data-target="calendar" title="달력 보기">
+                    <span class="furn-tag">달력</span>
+                    <svg viewBox="0 0 24 28" width="100%" height="100%" shape-rendering="crispEdges">
+                        <!-- 걸이 끈 -->
+                        <rect x="11" y="0" width="2" height="2" fill="#4a3525"/>
+                        <rect x="8" y="2" width="3" height="1" fill="#4a3525"/>
+                        <rect x="13" y="2" width="3" height="1" fill="#4a3525"/>
+                        <!-- 달력 본체 테두리 -->
+                        <rect x="2" y="3" width="20" height="23" fill="#4a3525"/>
+                        <!-- 상단 빨간 헤더 -->
+                        <rect x="3" y="4" width="18" height="5" fill="#ff7e7e"/>
+                        <rect x="6" y="3" width="2" height="2" fill="#fff"/>
+                        <rect x="16" y="3" width="2" height="2" fill="#fff"/>
+                        <!-- 흰색 날짜 면 -->
+                        <rect x="3" y="9" width="18" height="16" fill="#fffdf9"/>
+                        <!-- 날짜 도트들 -->
+                        <rect x="5" y="11" width="2" height="2" fill="#ff7e7e"/>
+                        <rect x="9" y="11" width="2" height="2" fill="#8c7a6b"/>
+                        <rect x="13" y="11" width="2" height="2" fill="#8c7a6b"/>
+                        <rect x="17" y="11" width="2" height="2" fill="#7aa8ff"/>
+                        <rect x="5" y="15" width="2" height="2" fill="#ff7e7e"/>
+                        <rect x="9" y="15" width="2" height="2" fill="#8c7a6b"/>
+                        <!-- 오늘 표시 하트/강조 -->
+                        <rect x="12" y="14" width="4" height="4" fill="#ffd166"/>
+                        <rect x="13" y="15" width="2" height="2" fill="#e65c5c"/>
+                        <rect x="17" y="15" width="2" height="2" fill="#7aa8ff"/>
+                        <rect x="5" y="19" width="2" height="2" fill="#ff7e7e"/>
+                        <rect x="9" y="19" width="2" height="2" fill="#8c7a6b"/>
+                        <rect x="13" y="19" width="2" height="2" fill="#8c7a6b"/>
+                    </svg>
+                </div>
+
+                <!-- 숲이 보이는 창문 -->
+                <div class="furniture window-unit" data-target="window" title="창밖 숲 구경하기">
+                    <span class="furn-tag">숲 창문</span>
+                    <svg viewBox="0 0 48 40" width="100%" height="100%" shape-rendering="crispEdges">
+                        <!-- 창틀 외곽 -->
+                        <rect x="1" y="1" width="46" height="36" fill="#5a4638"/>
+                        <rect x="2" y="2" width="44" height="34" fill="#fff6eb"/>
+                        <!-- 하늘 배경 -->
+                        <rect x="4" y="4" width="40" height="30" fill="#bceeff"/>
+                        <!-- 뭉게구름 -->
+                        <rect x="8" y="7" width="8" height="3" fill="#ffffff"/>
+                        <rect x="10" y="6" width="4" height="1" fill="#ffffff"/>
+                        <rect x="30" y="9" width="9" height="3" fill="#ffffff"/>
+                        <rect x="32" y="8" width="5" height="1" fill="#ffffff"/>
+                        <!-- 먼 산 / 숲 실루엣 -->
+                        <rect x="4" y="19" width="40" height="15" fill="#7ec876"/>
+                        <rect x="6" y="16" width="10" height="4" fill="#7ec876"/>
+                        <rect x="22" y="17" width="14" height="4" fill="#7ec876"/>
+                        <!-- 가까운 진한 초록 숲 나무들 -->
+                        <rect x="4" y="24" width="40" height="10" fill="#4ea356"/>
+                        <rect x="7" y="20" width="6" height="5" fill="#4ea356"/>
+                        <rect x="9" y="18" width="2" height="2" fill="#63ba6b"/>
+                        <rect x="18" y="21" width="8" height="4" fill="#3d8c45"/>
+                        <rect x="31" y="19" width="7" height="6" fill="#4ea356"/>
+                        <rect x="33" y="17" width="3" height="2" fill="#76cf7e"/>
+                        <!-- 창문 십자 격자 살 -->
+                        <rect x="23" y="2" width="2" height="34" fill="#5a4638"/>
+                        <rect x="2" y="18" width="44" height="2" fill="#5a4638"/>
+                        <!-- 창턱 -->
+                        <rect x="0" y="36" width="48" height="4" fill="#5a4638"/>
+                        <rect x="1" y="37" width="46" height="2" fill="#f2d6b8"/>
+                    </svg>
+                </div>
+
+                <!-- 벽걸이 코르크 메모판 -->
+                <div class="furniture memoboard-unit" data-target="memoboard" title="메모판 확인하기">
+                    <span class="furn-tag">메모판</span>
+                    <svg viewBox="0 0 28 26" width="100%" height="100%" shape-rendering="crispEdges">
+                        <!-- 나무 프레임 -->
+                        <rect x="1" y="1" width="26" height="24" fill="#5a4638"/>
+                        <rect x="2" y="2" width="24" height="22" fill="#c98b53"/>
+                        <!-- 코르크 보드 면 -->
+                        <rect x="4" y="4" width="20" height="18" fill="#e6b078"/>
+                        <!-- 포스트잇 1 (노랑) -->
+                        <rect x="6" y="6" width="7" height="7" fill="#fff176"/>
+                        <rect x="9" y="5" width="2" height="2" fill="#ff5252"/>
+                        <rect x="7" y="8" width="5" height="1" fill="#8c7a3e"/>
+                        <rect x="7" y="10" width="4" height="1" fill="#8c7a3e"/>
+                        <!-- 포스트잇 2 (분홍) -->
+                        <rect x="15" y="7" width="7" height="7" fill="#ffb3c6"/>
+                        <rect x="18" y="6" width="2" height="2" fill="#448aff"/>
+                        <rect x="16" y="9" width="5" height="1" fill="#8c4a5a"/>
+                        <rect x="16" y="11" width="3" height="1" fill="#8c4a5a"/>
+                        <!-- 포스트잇 3 (민트) -->
+                        <rect x="9" y="14" width="8" height="6" fill="#b9fbc0"/>
+                        <rect x="12" y="13" width="2" height="2" fill="#ff9800"/>
+                        <rect x="10" y="16" width="6" height="1" fill="#467a4c"/>
+                    </svg>
+                </div>
+            </div>
+
+            <!-- 2. 나무 바닥 영역 -->
+            <div class="wood-floor" id="woodFloor">
+                
+                <!-- 아늑한 러그 -->
+                <div class="pixel-rug"></div>
+
+                <!-- 책장 (탑다운/쿼터뷰 픽셀 아트) -->
+                <div class="furniture bookshelf-unit" data-target="bookshelf" title="책장 살펴보기">
+                    <span class="furn-tag">책장</span>
+                    <svg viewBox="0 0 40 36" width="100%" height="100%" shape-rendering="crispEdges">
+                        <!-- 그림자 -->
+                        <rect x="2" y="32" width="36" height="4" fill="rgba(74,53,37,0.28)"/>
+                        <!-- 책장 외곽 -->
+                        <rect x="2" y="1" width="36" height="32" fill="#4a3525"/>
+                        <rect x="3" y="2" width="34" height="30" fill="#9c663b"/>
+                        <!-- 윗판 (탑다운 두께감) -->
+                        <rect x="3" y="2" width="34" height="5" fill="#bd8251"/>
+                        <!-- 1단 선반 -->
+                        <rect x="5" y="8" width="30" height="9" fill="#5e3a1e"/>
+                        <!-- 책들 1단 -->
+                        <rect x="6" y="10" width="3" height="7" fill="#ff7b7b"/>
+                        <rect x="9" y="9" width="3" height="8" fill="#ffd166"/>
+                        <rect x="12" y="10" width="3" height="7" fill="#70d6ff"/>
+                        <rect x="15" y="11" width="3" height="6" fill="#90be6d"/>
+                        <rect x="22" y="10" width="3" height="7" fill="#c77dff"/>
+                        <rect x="25" y="9" width="4" height="8" fill="#ff9f1c"/>
+                        <rect x="30" y="11" width="4" height="6" fill="#f4f1de"/>
+                        <!-- 중간 선반 판 -->
+                        <rect x="4" y="17" width="32" height="2" fill="#bd8251"/>
+                        <!-- 2단 선반 -->
+                        <rect x="5" y="19" width="30" height="10" fill="#5e3a1e"/>
+                        <!-- 책들 2단 & 소품 -->
+                        <rect x="6" y="21" width="3" height="8" fill="#4ea8de"/>
+                        <rect x="9" y="20" width="3" height="9" fill="#ff758f"/>
+                        <rect x="12" y="22" width="3" height="7" fill="#ffe66d"/>
+                        <!-- 작은 화분 장식 -->
+                        <rect x="20" y="25" width="4" height="4" fill="#e07a5f"/>
+                        <rect x="20" y="22" width="4" height="3" fill="#6ab04c"/>
+                        <!-- 눕혀놓은 책 -->
+                        <rect x="27" y="26" width="7" height="3" fill="#81b29a"/>
+                        <rect x="28" y="24" width="6" height="2" fill="#f2cc8f"/>
+                    </svg>
+                </div>
+
+                <!-- 작업 책상 & 의자 -->
+                <div class="furniture desk-unit" data-target="desk" title="작업 책상에 앉기">
+                    <span class="furn-tag">작업 책상</span>
+                    <svg viewBox="0 0 56 46" width="100%" height="100%" shape-rendering="crispEdges">
+                        <!-- 의자 (책상 아래/왼쪽에 살짝 놓인 탑다운 의자) -->
+                        <rect x="16" y="27" width="16" height="15" fill="rgba(74,53,37,0.25)"/>
+                        <rect x="17" y="26" width="14" height="13" fill="#4a3525"/>
+                        <rect x="18" y="27" width="12" height="11" fill="#ff9ebb"/>
+                        <rect x="19" y="28" width="10" height="8" fill="#ffc2d4"/>
+                        <!-- 의자 등받이 -->
+                        <rect x="16" y="35" width="16" height="5" fill="#4a3525"/>
+                        <rect x="17" y="36" width="14" height="3" fill="#e57a9b"/>
+
+                        <!-- 책상 그림자 -->
+                        <rect x="2" y="27" width="52" height="5" fill="rgba(74,53,37,0.28)"/>
+                        <!-- 책상 본체 (탑다운 상판) -->
+                        <rect x="2" y="3" width="52" height="25" fill="#4a3525"/>
+                        <rect x="3" y="4" width="50" height="20" fill="#e8b882"/>
+                        <!-- 책상 앞면 두께 -->
+                        <rect x="3" y="24" width="50" height="3" fill="#b8844c"/>
+
+                        <!-- 책상 위 1: 스케치북 & 연필 -->
+                        <rect x="7" y="8" width="14" height="11" fill="#5a4638"/>
+                        <rect x="8" y="9" width="12" height="9" fill="#ffffff"/>
+                        <!-- 스케치북 안 귀여운 그림 -->
+                        <rect x="11" y="11" width="5" height="4" fill="#d49a6a"/>
+                        <rect x="12" y="12" width="1" height="1" fill="#000"/>
+                        <rect x="14" y="12" width="1" height="1" fill="#000"/>
+                        <!-- 색연필 -->
+                        <rect x="22" y="10" width="1" height="7" fill="#ff595e"/>
+                        <rect x="24" y="11" width="1" height="6" fill="#1982c4"/>
+
+                        <!-- 책상 위 2: 미니 노트북/모니터 -->
+                        <rect x="28" y="6" width="14" height="10" fill="#3d3540"/>
+                        <rect x="29" y="7" width="12" height="7" fill="#9bf6ff"/>
+                        <rect x="31" y="9" width="6" height="1" fill="#3d3540"/>
+                        <rect x="31" y="11" width="8" height="1" fill="#3d3540"/>
+                        <!-- 키보드 -->
+                        <rect x="28" y="17" width="14" height="4" fill="#d8d2db"/>
+                        <rect x="29" y="18" width="12" height="2" fill="#8f8694"/>
+
+                        <!-- 책상 위 3: 따뜻한 머그컵 -->
+                        <rect x="45" y="13" width="5" height="5" fill="#4a3525"/>
+                        <rect x="46" y="14" width="3" height="3" fill="#ff7b7b"/>
+                        <rect x="47" y="14" width="1" height="1" fill="#6f4e37"/>
+                    </svg>
+                </div>
+
+                <!-- 구석 화분 장식 -->
+                <div class="plant-decor">
+                    <svg viewBox="0 0 18 22" width="100%" height="100%" shape-rendering="crispEdges">
+                        <rect x="4" y="13" width="10" height="8" fill="#4a3525"/>
+                        <rect x="5" y="14" width="8" height="6" fill="#d97254"/>
+                        <rect x="4" y="13" width="10" height="2" fill="#e88d72"/>
+                        <!-- 잎사귀 -->
+                        <rect x="7" y="5" width="4" height="8" fill="#4ea356"/>
+                        <rect x="3" y="7" width="4" height="4" fill="#63ba6b"/>
+                        <rect x="11" y="6" width="4" height="5" fill="#63ba6b"/>
+                        <rect x="6" y="3" width="6" height="3" fill="#7ed987"/>
+                    </svg>
+                </div>
+
+                <!-- 목적지 표시 링 -->
+                <div class="target-marker" id="targetMarker"></div>
+
+                <!-- ★ 우땅이 캐릭터 (첨부 사진 기반 픽셀 아트) ★ -->
+                <div class="woodang-actor idle" id="woodangActor" style="left: 50%; top: 58%;">
+                    <!-- 말풍선 -->
+                    <div class="speech-bubble" id="speechBubble">우땅! 작업실에 온 걸 환영해!</div>
+                    
+                    <!-- 발밑 그림자 -->
+                    <div class="woodang-shadow"></div>
+
+                    <!-- 우땅이 픽셀 스프라이트 SVG -->
+                    <div class="woodang-sprite">
+                        <svg viewBox="0 0 32 36" width="100%" height="100%" shape-rendering="crispEdges">
+                            <!--
+                                첨부 이미지 특징 반영:
+                                1. 둥글고 큰 갈색 머리 + 위쪽 삐죽삐죽한 검은 머리카락 라인
+                                2. 양옆에 달린 동그란 귀 (안쪽 연분홍/아이보리)
+                                3. 눈 주변 하얀 동그란 무늬 + 크고 반짝이는 검은 눈동자 (하이라이트 도트)
+                                4. 입 주변 하얀 동그란 주둥이 + 작은 콧구멍 두 개 + 귀여운 'ㅇ' 또는 미소 입
+                                5. 통통한 갈색 몸통과 양팔, 하얀 손/발
+                            -->
+
+                            <!-- 검은 외곽선 (머리) -->
+                            <rect x="10" y="2" width="12" height="1" fill="#181210"/>
+                            <rect x="8" y="3" width="16" height="1" fill="#181210"/>
+                            <!-- 위쪽 삐죽 머리카락 디테일 -->
+                            <rect x="7" y="2" width="2" height="1" fill="#181210"/>
+                            <rect x="21" y="1" width="2" height="1" fill="#181210"/>
+
+                            <rect x="6" y="4" width="20" height="16" fill="#181210"/>
+                            <rect x="5" y="6" width="22" height="12" fill="#181210"/>
+
+                            <!-- 왼쪽 귀 -->
+                            <rect x="3" y="9" width="3" height="5" fill="#181210"/>
+                            <rect x="4" y="10" width="2" height="3" fill="#f7ebe6"/>
+
+                            <!-- 오른쪽 귀 -->
+                            <rect x="26" y="9" width="3" height="5" fill="#181210"/>
+                            <rect x="26" y="10" width="2" height="3" fill="#f7ebe6"/>
+
+                            <!-- 머리 갈색 채우기 (#b87d56) -->
+                            <rect x="10" y="3" width="12" height="1" fill="#b87d56"/>
+                            <rect x="8" y="4" width="16" height="15" fill="#b87d56"/>
+                            <rect x="6" y="6" width="20" height="11" fill="#b87d56"/>
+
+                            <!-- 눈썹 살짝 -->
+                            <rect x="9" y="6" width="2" height="1" fill="#181210"/>
+                            <rect x="19" y="5" width="2" height="1" fill="#181210"/>
+
+                            <!-- 왼쪽 눈 주변 하얀 털 무늬 -->
+                            <rect x="8" y="8" width="6" height="6" fill="#f7ebe6"/>
+                            <rect x="9" y="7" width="4" height="8" fill="#f7ebe6"/>
+                            <rect x="7" y="9" width="8" height="4" fill="#f7ebe6"/>
+
+                            <!-- 오른쪽 눈 주변 하얀 털 무늬 -->
+                            <rect x="18" y="7" width="6" height="7" fill="#f7ebe6"/>
+                            <rect x="19" y="6" width="4" height="9" fill="#f7ebe6"/>
+                            <rect x="17" y="8" width="8" height="5" fill="#f7ebe6"/>
+
+                            <!-- 왼쪽 검은 눈동자 & 반짝임 -->
+                            <rect x="9" y="9" width="3" height="3" fill="#181210"/>
+                            <rect x="10" y="9" width="1" height="1" fill="#ffffff"/>
+
+                            <!-- 오른쪽 큰 검은 눈동자 & 반짝임 (사진처럼 살짝 더 크고 똘망하게) -->
+                            <rect x="19" y="8" width="4" height="4" fill="#181210"/>
+                            <rect x="20" y="8" width="1" height="1" fill="#ffffff"/>
+                            <rect x="21" y="10" width="1" height="1" fill="#ffffff"/>
+
+                            <!-- 입 주변 하얀 주둥이 무늬 -->
+                            <rect x="11" y="13" width="10" height="6" fill="#f7ebe6"/>
+                            <rect x="10" y="14" width="12" height="4" fill="#f7ebe6"/>
+
+                            <!-- 작은 콧구멍 2개 -->
+                            <rect x="14" y="14" width="1" height="1" fill="#181210"/>
+                            <rect x="17" y="14" width="1" height="1" fill="#181210"/>
+
+                            <!-- 귀여운 'ㅇ' 입 -->
+                            <rect x="15" y="16" width="2" height="2" fill="#181210"/>
+
+                            <!-- 몸통 & 팔 외곽선 -->
+                            <rect x="9" y="20" width="14" height="9" fill="#181210"/>
+                            <rect x="8" y="21" width="16" height="7" fill="#181210"/>
+                            <!-- 왼쪽 팔 -->
+                            <rect x="5" y="21" width="4" height="4" fill="#181210"/>
+                            <rect x="4" y="23" width="3" height="3" fill="#181210"/>
+                            <!-- 오른쪽 팔 -->
+                            <rect x="23" y="21" width="4" height="4" fill="#181210"/>
+                            <rect x="25" y="23" width="3" height="3" fill="#181210"/>
+
+                            <!-- 몸통 & 팔 갈색 채우기 -->
+                            <rect x="10" y="20" width="12" height="8" fill="#b87d56"/>
+                            <rect x="9" y="21" width="14" height="6" fill="#b87d56"/>
+                            <rect x="6" y="22" width="3" height="2" fill="#b87d56"/>
+                            <rect x="23" y="22" width="3" height="2" fill="#b87d56"/>
+
+                            <!-- 하얀 왼손 / 오른손 -->
+                            <rect x="4" y="24" width="2" height="2" fill="#ffffff"/>
+                            <rect x="26" y="24" width="2" height="2" fill="#ffffff"/>
+
+                            <!-- 다리 외곽선 & 갈색 -->
+                            <rect x="10" y="29" width="4" height="3" fill="#181210"/>
+                            <rect x="18" y="29" width="4" height="3" fill="#181210"/>
+                            <rect x="11" y="29" width="2" height="2" fill="#b87d56"/>
+                            <rect x="19" y="29" width="2" height="2" fill="#b87d56"/>
+
+                            <!-- 하얀 왼발 / 오른발 -->
+                            <rect x="9" y="32" width="5" height="2" fill="#181210"/>
+                            <rect x="10" y="32" width="3" height="1" fill="#ffffff"/>
+
+                            <rect x="18" y="32" width="5" height="2" fill="#181210"/>
+                            <rect x="19" y="32" width="3" height="1" fill="#ffffff"/>
+                        </svg>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </main>
+
+    <!-- 하단 퀵 이동 버튼 바 -->
+    <footer class="bottom-dock">
+        <div class="dock-hint">방 안의 가구나 바닥을 눌러 우땅이를 움직여 보세요!</div>
+        <div class="quick-buttons">
+            <button class="pixel-btn" data-go="window">
+                <span>🌲</span>
+                <span>창문</span>
+            </button>
+            <button class="pixel-btn" data-go="calendar">
+                <span>📅</span>
+                <span>달력</span>
+            </button>
+            <button class="pixel-btn" data-go="memoboard">
+                <span>📌</span>
+                <span>메모판</span>
+            </button>
+            <button class="pixel-btn" data-go="bookshelf">
+                <span>📚</span>
+                <span>책장</span>
+            </button>
+            <button class="pixel-btn" data-go="desk">
+                <span>✏️</span>
+                <span>책상</span>
+            </button>
+        </div>
+    </footer>
+
+    <!-- 가구 도착 후 상세 상호작용 팝업 -->
+    <div class="pixel-modal-backdrop" id="modalBackdrop">
+        <div class="pixel-modal">
+            <div class="modal-header">
+                <span id="modalTitle">제목</span>
+                <button class="modal-close" id="modalClose">X</button>
+            </div>
+            <div class="modal-body" id="modalBody"></div>
+        </div>
+    </div>
+
+    <!-- 화면 아래 슬라이드 서랍 (메모판 할 일 목록 & 달력 D-Day 관리) -->
+    <section class="bottom-drawer" id="bottomDrawer" aria-hidden="true">
+        <div class="drawer-header">
+            <span id="drawerTitle">📌 우땅이의 할 일 목록</span>
+            <button class="modal-close" id="drawerClose">닫기 X</button>
+        </div>
+        <div class="drawer-body" id="drawerBody"></div>
+    </section>
+</div>
+
+<script>
+    /**
+     * 우땅이의 작은 픽셀 작업실 인터랙션 로직
+     * - 가구 또는 바닥 터치/클릭 시 우땅이가 해당 좌표 앞까지 부드럽게 걸어감
+     * - 도착 시 말풍선 대사 출력 및 가구별 미니 상호작용 팝업 제공
+     */
+    window.addEventListener('DOMContentLoaded', () => {
+        const woodFloor = document.getElementById('woodFloor');
+        const actor = document.getElementById('woodangActor');
+        const speechBubble = document.getElementById('speechBubble');
+        const targetMarker = document.getElementById('targetMarker');
+        const statusBadge = document.getElementById('statusBadge');
+        const modalBackdrop = document.getElementById('modalBackdrop');
+        const modalTitle = document.getElementById('modalTitle');
+        const modalBody = document.getElementById('modalBody');
+        const modalClose = document.getElementById('modalClose');
+        const bottomDrawer = document.getElementById('bottomDrawer');
+        const drawerTitle = document.getElementById('drawerTitle');
+        const drawerBody = document.getElementById('drawerBody');
+        const drawerClose = document.getElementById('drawerClose');
+
+        // 현재 우땅이 위치 (woodFloor 기준 픽셀 좌표)
+        let currentX = woodFloor.clientWidth * 0.5;
+        let currentY = woodFloor.clientHeight * 0.58;
+        let targetX = currentX;
+        let targetY = currentY;
+        let isWalking = false;
+        let pendingInteraction = null;
+        let speechTimer = null;
+
+        // 1. 메모판 할 일 목록 데이터 (브라우저 저장소 연동, 기존 문자열 데이터도 자동 변환 지원)
+        let rawMemos = JSON.parse(localStorage.getItem('woodang_memos'));
+        let memos = Array.isArray(rawMemos)
+            ? rawMemos.map(item => typeof item === 'string' ? { text: item, done: false } : item)
+            : [
+                { text: '바나나 우유 사오기 🍌', done: false },
+                { text: '숲 풍경 픽셀 그림 완성하기 🎨', done: true },
+                { text: '창문 열고 환기시키기 🌿', done: false }
+            ];
+
+        // 2. 달력 마감 일정 데이터 (브라우저 저장소 연동)
+        function getOffsetDateStr(offsetDays) {
+            const d = new Date();
+            d.setDate(d.getDate() + offsetDays);
+            const yyyy = d.getFullYear();
+            const mm = String(d.getMonth() + 1).padStart(2, '0');
+            const dd = String(d.getDate()).padStart(2, '0');
+            return `${yyyy}-${mm}-${dd}`;
+        }
+
+        let deadlines = JSON.parse(localStorage.getItem('woodang_deadlines')) || [
+            { title: '기업 분석 발표', date: getOffsetDateStr(3) },
+            { title: '작업실 대청소하기', date: getOffsetDateStr(7) }
+        ];
+
+        // 가구별 목표 위치 비율 & 대사 설정
+        const furnitureSpots = {
+            window: {
+                rx: 0.50,
+                ry: 0.14,
+                status: '숲 구경 중 🌲',
+                quote: '와아~ 창밖 숲 공기가 상쾌해!',
+                openModal: true
+            },
+            calendar: {
+                rx: 0.16,
+                ry: 0.14,
+                status: '일정 확인 중 📅',
+                quote: '오늘 날짜가 며칠이더라~?',
+                openModal: true
+            },
+            memoboard: {
+                rx: 0.84,
+                ry: 0.14,
+                status: '메모 확인 중 📌',
+                quote: '까먹지 않게 메모를 적어뒀지!',
+                openModal: true
+            },
+            bookshelf: {
+                rx: 0.24,
+                ry: 0.42,
+                status: '책 고르는 중 📚',
+                quote: '오늘은 어떤 재미있는 책을 읽을까?',
+                openModal: true
+            },
+            desk: {
+                rx: 0.68,
+                ry: 0.72,
+                status: '열심히 작업 중 ✏️',
+                quote: '슥삭슥삭~ 멋진 아이디어를 그리는 중!',
+                openModal: true
+            }
+        };
+
+        // 초기 위치 반영
+        function updateActorPosition() {
+            actor.style.left = `${currentX}px`;
+            actor.style.top = `${currentY}px`;
+            // Y좌표에 따른 자연스러운 앞뒤 레이어(z-index) 조정
+            actor.style.zIndex = Math.floor(15 + (currentY / woodFloor.clientHeight) * 10);
+        }
+
+        // 리사이즈 시 비율 재계산
+        function syncInitialPosition() {
+            currentX = woodFloor.clientWidth * 0.5;
+            currentY = woodFloor.clientHeight * 0.58;
+            targetX = currentX;
+            targetY = currentY;
+            updateActorPosition();
+        }
+        syncInitialPosition();
+
+        // 말풍선 띄우기
+        function showSpeech(text, duration = 2600) {
+            speechBubble.textContent = text;
+            speechBubble.classList.add('show');
+            clearTimeout(speechTimer);
+            speechTimer = setTimeout(() => {
+                speechBubble.classList.remove('show');
+            }, duration);
+        }
+
+        // 목적지 마커 표시
+        function showTargetRing(x, y) {
+            targetMarker.style.left = `${x}px`;
+            targetMarker.style.top = `${y}px`;
+            targetMarker.style.opacity = '1';
+        }
+
+        function hideTargetRing() {
+            targetMarker.style.opacity = '0';
+        }
+
+        // 특정 좌표로 이동 명령
+        function moveWoodangTo(x, y, interactionKey = null) {
+            // 바닥 경계 안쪽으로 안전하게 제한
+            const padX = 34;
+            const minY = 26;
+            const maxY = woodFloor.clientHeight - 16;
+
+            targetX = Math.max(padX, Math.min(woodFloor.clientWidth - padX, x));
+            targetY = Math.max(minY, Math.min(maxY, y));
+            pendingInteraction = interactionKey;
+
+            // 이동 방향에 따라 캐릭터 좌우 반전 (머리 위 삐죽 머리 방향 등 자연스럽게)
+            const sprite = actor.querySelector('.woodang-sprite');
+            if (targetX < currentX - 4) {
+                sprite.style.transform = 'scaleX(-1)';
+            } else if (targetX > currentX + 4) {
+                sprite.style.transform = 'scaleX(1)';
+            }
+
+            isWalking = true;
+            actor.classList.remove('idle', 'happy');
+            actor.classList.add('walking');
+            statusBadge.textContent = '아장아장 이동 중 🐾';
+            showTargetRing(targetX, targetY);
+        }
+
+        // 가구 키로 이동
+        function goToFurniture(key) {
+            const spot = furnitureSpots[key];
+            if (!spot) return;
+
+            // 하단 버튼 활성화 표시
+            document.querySelectorAll('.pixel-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.go === key);
+            });
+
+            const tx = woodFloor.clientWidth * spot.rx;
+            const ty = woodFloor.clientHeight * spot.ry;
+            showSpeech('총총총~ 가보자!');
+            moveWoodangTo(tx, ty, key);
+        }
+
+        // 가구 도착 시 실행되는 이벤트
+        function onArriveDestination() {
+            isWalking = false;
+            actor.classList.remove('walking');
+            actor.classList.add('happy');
+            hideTargetRing();
+
+            setTimeout(() => {
+                if (!isWalking) {
+                    actor.classList.remove('happy');
+                    actor.classList.add('idle');
+                }
+            }, 700);
+
+            if (pendingInteraction && furnitureSpots[pendingInteraction]) {
+                const spot = furnitureSpots[pendingInteraction];
+                statusBadge.textContent = spot.status;
+                showSpeech(spot.quote, 3200);
+
+                // 살짝 딜레이 후 가구 상세 팝업 열기
+                const key = pendingInteraction;
+                pendingInteraction = null;
+                setTimeout(() => {
+                    openFurnitureModal(key);
+                }, 420);
+            } else {
+                statusBadge.textContent = '두리번두리번 👀';
+                showSpeech('우땅! 여기 도착했어!');
+            }
+        }
+
+        // 애니메이션 프레임 루프 (픽셀 게임 느낌의 일정 속도 이동)
+        function animateLoop() {
+            if (isWalking) {
+                const dx = targetX - currentX;
+                const dy = targetY - currentY;
+                const dist = Math.hypot(dx, dy);
+                const speed = 3.2; // 픽셀 이동 속도
+
+                if (dist <= speed) {
+                    currentX = targetX;
+                    currentY = targetY;
+                    updateActorPosition();
+                    onArriveDestination();
+                } else {
+                    currentX += (dx / dist) * speed;
+                    currentY += (dy / dist) * speed;
+                    updateActorPosition();
+                }
+            }
+            requestAnimationFrame(animateLoop);
+        }
+        requestAnimationFrame(animateLoop);
+
+        // 가구 클릭 이벤트 연결 (벽/바닥 가구 모두)
+        document.querySelectorAll('.furniture').forEach(el => {
+            el.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const targetKey = el.dataset.target;
+                goToFurniture(targetKey);
+            });
+        });
+
+        // 하단 퀵 버튼 클릭 이벤트 연결
+        document.querySelectorAll('.pixel-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const targetKey = btn.dataset.go;
+                goToFurniture(targetKey);
+            });
+        });
+
+        // 나무 바닥 빈 곳 클릭 시 해당 위치로 걸어가기
+        woodFloor.addEventListener('click', (e) => {
+            const rect = woodFloor.getBoundingClientRect();
+            const clickX = e.clientX - rect.left;
+            const clickY = e.clientY - rect.top;
+
+            document.querySelectorAll('.pixel-btn').forEach(btn => btn.classList.remove('active'));
+            moveWoodangTo(clickX, clickY, null);
+        });
+
+        // 가구별 인터랙티브 모달 / 하단 서랍 구성
+        function openFurnitureModal(key) {
+            if (key === 'memoboard') {
+                modalBackdrop.classList.remove('open');
+                openTodoDrawer();
+                return;
+            }
+            if (key === 'calendar') {
+                modalBackdrop.classList.remove('open');
+                openCalendarDrawer();
+                return;
+            }
+
+            bottomDrawer.classList.remove('open');
+
+            if (key === 'window') {
+                modalTitle.textContent = '🌲 숲이 보이는 창문';
+                modalBody.innerHTML = `
+                    <div style="background:#bceeff; border:3px solid #5a4638; padding:12px; border-radius:4px; text-align:center; margin-bottom:10px;">
+                        <div style="font-size:24px; margin-bottom:4px;">🌳🐿️🌲🍃</div>
+                        <div style="font-weight:bold; color:#2d5a36;">살랑살랑 바람이 불어오는 초록 숲</div>
+                    </div>
+                    <p style="margin:0;">창문 밖으로 울창한 나무들과 하얀 구름이 보여요. 우땅이가 가장 좋아하는 힐링 스팟이에요!</p>
+                `;
+            } else if (key === 'bookshelf') {
+                modalTitle.textContent = '📚 아기자기 책장';
+                modalBody.innerHTML = `
+                    <p style="margin-top:0;">책장에 알록달록한 책들이 꽂혀 있어요:</p>
+                    <div style="background:#f5e6d3; border:2px solid #8c6647; padding:8px; margin-bottom:6px;">
+                        📕 <b>《초보자를 위한 픽셀 아트 입문》</b><br>
+                        <span style="font-size:11px; color:#6e5038;">"점 하나하나 정성을 담아 찍어보자!"</span>
+                    </div>
+                    <div style="background:#f5e6d3; border:2px solid #8c6647; padding:8px;">
+                        📗 <b>《숲속 친구들과 바나나 레시피》</b><br>
+                        <span style="font-size:11px; color:#6e5038;">"달콤한 바나나 팬케이크 만드는 법 수록"</span>
+                    </div>
+                `;
+            } else if (key === 'desk') {
+                modalTitle.textContent = '✏️ 우땅이의 작업 책상';
+                modalBody.innerHTML = `
+                    <p style="margin-top:0;">책상 위 스케치북에 우땅이가 그린 자화상이 놓여 있어요!</p>
+                    <div style="background:#ffffff; border:3px solid #5a4638; padding:10px; text-align:center;">
+                        <div style="font-size:13px; font-weight:bold; margin-bottom:4px;">🎨 오늘의 작업 목표</div>
+                        <div style="font-size:11px; color:#6b523e;">따뜻하고 포근한 나만의 작은 방 꾸미기 완료! ✨</div>
+                    </div>
+                `;
+            }
+
+            modalBackdrop.classList.add('open');
+        }
+
+        // [기능 1] 메모판 클릭 시 화면 아래에 열리는 할 일 목록 서랍 (추가/체크/삭제 + 저장)
+        function saveMemos() {
+            localStorage.setItem('woodang_memos', JSON.stringify(memos));
+        }
+
+        function openTodoDrawer() {
+            drawerTitle.textContent = '📌 우땅이의 할 일 목록';
+            renderTodoDrawer();
+            bottomDrawer.classList.add('open');
+        }
+
+        function renderTodoDrawer() {
+            drawerBody.innerHTML = `
+                <div class="memo-input-row" style="margin-top:0; margin-bottom:10px;">
+                    <input type="text" id="todoInput" class="memo-input" placeholder="새로운 할 일을 입력하세요..." maxlength="40">
+                    <button id="todoAddBtn" class="memo-add-btn">추가</button>
+                </div>
+                <div id="todoListWrap">
+                    ${memos.length === 0
+                        ? '<div style="text-align:center; color:#8c7a6b; padding:14px 0;">할 일이 비어 있어요! 새로 추가해 보세요 ✨</div>'
+                        : memos.map((item, idx) => `
+                            <div class="todo-item ${item.done ? 'done' : ''}">
+                                <label class="todo-left">
+                                    <input type="checkbox" class="todo-checkbox" data-idx="${idx}" ${item.done ? 'checked' : ''}>
+                                    <span class="todo-text">${escapeHtml(item.text)}</span>
+                                </label>
+                                <button class="memo-del" data-idx="${idx}" title="삭제">삭제</button>
+                            </div>
+                        `).join('')
+                    }
+                </div>
+            `;
+
+            const todoInput = document.getElementById('todoInput');
+            const todoAddBtn = document.getElementById('todoAddBtn');
+
+            const handleAddTodo = () => {
+                const text = todoInput.value.trim();
+                if (!text) return;
+                memos.unshift({ text, done: false });
+                saveMemos();
+                renderTodoDrawer();
+                showSpeech('새 할 일을 메모판에 붙였어! 📌');
+            };
+
+            todoAddBtn.addEventListener('click', handleAddTodo);
+            todoInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') handleAddTodo();
+            });
+
+            drawerBody.querySelectorAll('.todo-checkbox').forEach(chk => {
+                chk.addEventListener('change', () => {
+                    const idx = Number(chk.dataset.idx);
+                    memos[idx].done = chk.checked;
+                    saveMemos();
+                    renderTodoDrawer();
+                    if (chk.checked) {
+                        showSpeech('우와~ 할 일 하나 완료! 🎉');
+                    }
+                });
+            });
+
+            drawerBody.querySelectorAll('.memo-del').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const idx = Number(btn.dataset.idx);
+                    memos.splice(idx, 1);
+                    saveMemos();
+                    renderTodoDrawer();
+                    showSpeech('메모를 깔끔하게 떼어냈어!');
+                });
+            });
+        }
+
+        // [기능 2] 달력 클릭 시 마감 이름 & 날짜 입력 + 가까운 순 D-Day 표시 (3일 이내 빨간색)
+        function saveDeadlines() {
+            localStorage.setItem('woodang_deadlines', JSON.stringify(deadlines));
+        }
+
+        function calcDdayDiff(dateStr) {
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const [y, m, d] = dateStr.split('-').map(Number);
+            const target = new Date(y, m - 1, d);
+            target.setHours(0, 0, 0, 0);
+            return Math.round((target - today) / (1000 * 60 * 60 * 24));
+        }
+
+        function formatDdayLabel(diff) {
+            if (diff === 0) return 'D-Day';
+            if (diff > 0) return `D-${diff}`;
+            return `D+${Math.abs(diff)}`;
+        }
+
+        function openCalendarDrawer() {
+            drawerTitle.textContent = '📅 마감 일정 & D-Day 달력';
+            renderCalendarDrawer();
+            bottomDrawer.classList.add('open');
+        }
+
+        function renderCalendarDrawer() {
+            // 가까운 날짜 순서대로 정렬
+            const sorted = deadlines
+                .map((item, originalIdx) => ({
+                    ...item,
+                    originalIdx,
+                    diff: calcDdayDiff(item.date)
+                }))
+                .sort((a, b) => a.diff - b.diff);
+
+            drawerBody.innerHTML = `
+                <div class="dday-form">
+                    <input type="text" id="deadlineNameInput" class="memo-input" placeholder="마감 이름 (예: 기업 분석 발표)" maxlength="30">
+                    <div class="dday-form-row">
+                        <input type="date" id="deadlineDateInput" class="memo-input" value="${getOffsetDateStr(3)}">
+                        <button id="deadlineAddBtn" class="memo-add-btn">마감 등록</button>
+                    </div>
+                </div>
+                <div id="deadlineListWrap">
+                    ${sorted.length === 0
+                        ? '<div style="text-align:center; color:#8c7a6b; padding:12px 0;">등록된 마감 일정이 없어요!</div>'
+                        : sorted.map(item => {
+                            // 오늘 포함 3일 이내(0 <= diff <= 3) 남은 마감은 빨간색 강조
+                            const isUrgent = item.diff >= 0 && item.diff <= 3;
+                            const ddayText = formatDdayLabel(item.diff);
+                            return `
+                                <div class="dday-item ${isUrgent ? 'urgent' : ''}">
+                                    <div>
+                                        <span class="dday-badge">${ddayText}</span>
+                                        <span>${escapeHtml(item.title)}</span>
+                                        <div style="font-size:10px; opacity:0.75; margin-top:2px;">마감일: ${item.date}</div>
+                                    </div>
+                                    <button class="memo-del" data-idx="${item.originalIdx}" title="삭제">삭제</button>
+                                </div>
+                            `;
+                        }).join('')
+                    }
+                </div>
+            `;
+
+            const nameInput = document.getElementById('deadlineNameInput');
+            const dateInput = document.getElementById('deadlineDateInput');
+            const addBtn = document.getElementById('deadlineAddBtn');
+
+            const handleAddDeadline = () => {
+                const title = nameInput.value.trim();
+                const date = dateInput.value;
+                if (!title || !date) return;
+                deadlines.push({ title, date });
+                saveDeadlines();
+                renderCalendarDrawer();
+                showSpeech('달력에 중요한 마감을 표시했어! 📅');
+            };
+
+            addBtn.addEventListener('click', handleAddDeadline);
+            nameInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') handleAddDeadline();
+            });
+
+            drawerBody.querySelectorAll('.memo-del').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const idx = Number(btn.dataset.idx);
+                    deadlines.splice(idx, 1);
+                    saveDeadlines();
+                    renderCalendarDrawer();
+                    showSpeech('마감 일정을 지웠어!');
+                });
+            });
+        }
+
+        function escapeHtml(str) {
+            return str.replace(/[&<>"']/g, (m) => ({
+                '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+            }[m]));
+        }
+
+        // 모달 및 하단 서랍 닫기
+        modalClose.addEventListener('click', () => {
+            modalBackdrop.classList.remove('open');
+        });
+        modalBackdrop.addEventListener('click', (e) => {
+            if (e.target === modalBackdrop) {
+                modalBackdrop.classList.remove('open');
+            }
+        });
+        drawerClose.addEventListener('click', () => {
+            bottomDrawer.classList.remove('open');
+        });
+
+        // 첫 인사 말풍선 표시
+        setTimeout(() => {
+            showSpeech('안녕! 나는 우땅이야! 가구를 눌러봐~', 3500);
+        }, 500);
+    });
+</script>
+</body>
+</html>
